@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="음악과 함께 천천히 읽는 웹툰.">
+  <title>웹툰</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #fff; color: #111; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif; }
+    button, input { font: inherit; }
+    .wrapper { width: 100%; max-width: 1100px; margin: 0 auto; }
+    .player-section { padding: 56px 24px 36px; display: flex; justify-content: center; }
+    .player { width: 100%; max-width: 420px; }
+    .seek { display: block; appearance: none; -webkit-appearance: none; width: 100%; height: 20px; background: transparent; cursor: pointer; --progress: 0%; }
+    .seek::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, #111 var(--progress), #e5e5e5 var(--progress)); }
+    .seek::-moz-range-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, #111 var(--progress), #e5e5e5 var(--progress)); }
+    .seek::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #111; margin-top: -3px; opacity: 0; }
+    .seek::-moz-range-thumb { width: 10px; height: 10px; border: 0; border-radius: 50%; background: #111; opacity: 0; }
+    .seek:hover::-webkit-slider-thumb, .seek:focus-visible::-webkit-slider-thumb { opacity: 1; }
+    .seek:hover::-moz-range-thumb, .seek:focus-visible::-moz-range-thumb { opacity: 1; }
+    .time-row { display: flex; justify-content: space-between; margin-top: 8px; color: #888; font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+    .controls { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; }
+    .ctrl-btn { position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 8px; border: 0; background: transparent; color: #111; cursor: pointer; transition: opacity .2s, transform .15s; }
+    .ctrl-btn:hover { opacity: .55; }
+    .ctrl-btn:active { transform: scale(.9); }
+    .ctrl-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    .play-btn svg { width: 28px; height: 28px; }
+    .ctrl-btn:disabled { color: #c9c9c9; cursor: default; transform: none; opacity: 1; }
+    .ctrl-btn[aria-pressed="true"]::after { content: ""; position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #111; bottom: 0; }
+    :focus-visible { outline: 2px solid #777; outline-offset: 4px; border-radius: 3px; }
+    .play-btn.playing .icon-play, .play-btn:not(.playing) .icon-pause { display: none; }
+    .player-caption { margin-top: 28px; font-size: 12.5px; line-height: 1.7; color: #999; letter-spacing: .03em; text-align: center; }
+    .note-icon { margin-left: 4px; color: #555; }
+    .status { margin-top: 10px; font-size: 12px; line-height: 1.7; color: #777; text-align: center; }
+    .status:empty { display: none; }
+    .divider { height: 1px; background: #eee; margin-top: 44px; }
+    .webtoon-container { font-size: 0; line-height: 0; }
+    .webtoon-container img { display: block; width: 100%; height: auto; margin: 0; padding: 0; border: 0; }
+    .empty-state { min-height: 58vh; padding: 100px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .empty-state svg { width: 28px; height: 28px; margin-bottom: 24px; color: #b7b7b7; }
+    .empty-state p { color: #888; font-size: 14px; font-weight: 400; letter-spacing: .06em; }
+    .empty-state small { margin-top: 12px; color: #b0b0b0; font-size: 12px; }
+    [hidden] { display: none !important; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="wrapper">
+    <section class="player-section" aria-label="배경음악 플레이어">
+      <div class="player">
+        <input class="seek" id="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="음악 재생 위치" aria-valuetext="0:00" disabled>
+        <div class="time-row"><span id="currentTime">0:00</span><span id="duration">0:00</span></div>
+        <div class="controls">
+          <button class="ctrl-btn" id="repeatBtn" type="button" aria-label="한 곡 반복 켜기" aria-pressed="false" title="한 곡 반복">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+          </button>
+          <button class="ctrl-btn" id="prevBtn" type="button" aria-label="음악 처음으로" title="음악 처음으로">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          </button>
+          <button class="ctrl-btn play-btn" id="playBtn" type="button" aria-label="음악 재생" title="재생 / 일시정지">
+            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+          </button>
+          <button class="ctrl-btn" id="nextBtn" type="button" aria-label="음악 끝으로" title="음악 끝으로">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          </button>
+          <button class="ctrl-btn" type="button" disabled aria-label="셔플: 배경음악 한 곡에서는 사용하지 않음" title="한 곡 재생에서는 셔플을 사용하지 않습니다">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+          </button>
+        </div>
+        <p class="player-caption">재생 버튼을 눌러 음악과 함께 읽기<span class="note-icon">♪</span></p>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+    <p class="status" id="imageStatus" role="status" aria-live="polite"></p>
+    <div class="webtoon-container" id="webtoon" aria-label="웹툰 본문"></div>
+    <div class="empty-state" id="emptyState" hidden>
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="5" y="4" width="22" height="24" rx="1"/><path d="M5 14h22M16 4v10M5 23l6-6 7 6 4-4 5 5"/></svg>
+      <p>이야기가 곧 시작됩니다.</p>
+      <small>웹툰 준비 중</small>
+    </div>
+  </main>
+  <audio id="bgm" preload="none"></audio>
+  <script>
+    /* ═══════════════ 여기만 수정하세요 ═══════════════
+       음악: bgm 폴더에 bgm.mp3를 넣으세요.
+       웹툰: images 폴더에 01.webp, 02.webp, 03.webp를 넣으세요.
+       현재 3장 기준입니다. 03.webp는 나중에 추가해도 됩니다.
+       4장 이상이면 아래 배열에 경로를 순서대로 추가하세요.
+       PNG/JPG도 사용 가능: 경로의 확장자를 실제 파일과 맞추세요.
+       세로 길이는 입력하지 않습니다. 원본 비율로 자동 표시됩니다.
+    */
+    const CONFIG = {
+      music: 'bgm/bgm.mp3',
+      images: ['images/01.webp', 'images/02.webp', 'images/03.webp'],
+      optionalImages: ['images/03.webp'],
+      repeat: true
+    };
+
+    const bgm = document.getElementById('bgm');
+    const playBtn = document.getElementById('playBtn');
+    const repeatBtn = document.getElementById('repeatBtn');
+    const seek = document.getElementById('seek');
+    const currentTimeEl = document.getElementById('currentTime');
+    const durationEl = document.getElementById('duration');
+    const status = document.getElementById('status');
+    bgm.src = CONFIG.music;
+    bgm.loop = CONFIG.repeat;
+    // 자동재생과 별도 진입/로딩 화면 없음. play()는 버튼 클릭에서만 호출.
+    function formatTime(seconds) {
+      if (!Number.isFinite(seconds)) return '0:00';
+      const value = Math.max(0, Math.floor(seconds));
+      return Math.floor(value / 60) + ':' + String(value % 60).padStart(2, '0');
+    }
+    function syncProgress() {
+      const valid = Number.isFinite(bgm.duration) && bgm.duration > 0;
+      const progress = valid ? Math.min(1, Math.max(0, bgm.currentTime / bgm.duration)) : 0;
+      seek.disabled = !valid;
+      seek.value = Math.round(progress * 1000);
+      seek.style.setProperty('--progress', (progress * 100) + '%');
+      seek.setAttribute('aria-valuetext', formatTime(bgm.currentTime) + ' / ' + formatTime(bgm.duration));
+      currentTimeEl.textContent = formatTime(bgm.currentTime);
+      durationEl.textContent = formatTime(bgm.duration);
+    }
+    function syncPlayback() {
+      const playing = !bgm.paused && !bgm.ended;
+      playBtn.classList.toggle('playing', playing);
+      playBtn.setAttribute('aria-label', playing ? '음악 일시정지' : '음악 재생');
+    }
+    function syncRepeat() {
+      repeatBtn.setAttribute('aria-pressed', String(bgm.loop));
+      repeatBtn.setAttribute('aria-label', bgm.loop ? '한 곡 반복 끄기' : '한 곡 반복 켜기');
+    }
+    syncRepeat();
+    playBtn.addEventListener('click', async () => {
+      status.textContent = '';
+      if (!bgm.paused) { bgm.pause(); return; }
+      if (bgm.error) bgm.load();
+      if (bgm.ended) bgm.currentTime = 0;
+      try { await bgm.play(); }
+      catch (error) {
+        if (error.name !== 'AbortError') status.textContent = '음악을 불러오지 못했어요. 잠시 후 다시 재생해 주세요.';
+        syncPlayback();
+      }
+    });
+    repeatBtn.addEventListener('click', () => { bgm.loop = !bgm.loop; syncRepeat(); });
+    document.getElementById('prevBtn').addEventListener('click', () => {
+      if (bgm.readyState > 0) bgm.currentTime = 0;
+      syncProgress();
+    });
+    document.getElementById('nextBtn').addEventListener('click', () => {
+      if (!Number.isFinite(bgm.duration)) return;
+      bgm.pause();
+      bgm.currentTime = bgm.duration;
+      syncProgress();
+    });
+    seek.addEventListener('input', () => {
+      if (Number.isFinite(bgm.duration)) bgm.currentTime = Number(seek.value) / 1000 * bgm.duration;
+      syncProgress();
+    });
+    ['loadedmetadata', 'durationchange', 'timeupdate', 'emptied'].forEach(event => bgm.addEventListener(event, syncProgress));
+    ['play', 'pause', 'ended'].forEach(event => bgm.addEventListener(event, syncPlayback));
+    bgm.addEventListener('playing', () => { status.textContent = ''; });
+    bgm.addEventListener('waiting', () => { if (!bgm.paused) status.textContent = '음악을 불러오고 있어요…'; });
+    bgm.addEventListener('error', () => { status.textContent = '음악을 불러오지 못했어요. 잠시 후 다시 재생해 주세요.'; syncPlayback(); });
+
+    const webtoon = document.getElementById('webtoon');
+    const emptyState = document.getElementById('emptyState');
+    const imageStatus = document.getElementById('imageStatus');
+    const failedImages = new Set();
+    let loadedImages = 0;
+    let settledImages = 0;
+    function settleImage() {
+      settledImages++;
+      emptyState.hidden = loadedImages > 0 || settledImages < CONFIG.images.length;
+      imageStatus.textContent = loadedImages > 0 && failedImages.size > 0
+        ? Array.from(failedImages).sort((a, b) => a - b).join(', ') + '번째 이미지를 불러오지 못했어요. 새로고침해 주세요.'
+        : '';
+    }
+    emptyState.hidden = CONFIG.images.length > 0;
+    CONFIG.images.forEach((src, index) => {
+      const img = document.createElement('img');
+      img.alt = '웹툰 ' + (index + 1);
+      img.width = 1100;
+      // 높이·고정 비율·잘라내기 설정 없이 원본 전체를 이어 붙입니다.
+      img.decoding = 'async';
+      img.addEventListener('load', () => { loadedImages++; settleImage(); }, { once: true });
+      img.addEventListener('error', () => {
+        img.remove();
+        if (!CONFIG.optionalImages.includes(src)) failedImages.add(index + 1);
+        settleImage();
+      }, { once: true });
+      img.src = src;
+      webtoon.appendChild(img);
+    });
+  </script>
+</body>
+</html>
